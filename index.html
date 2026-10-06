@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Dashboard de Ejecución Presupuestal — GORE San Martín 2026</title>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <style>
 :root{--bg:#f4f7fb;--card:#fff;--text:#172033;--muted:#64748b;--line:#e5e7eb;--primary:#0f4c81;--accent:#0b8f72;--warn:#c47a00}
 *{box-sizing:border-box}body{margin:0;font-family:Inter,Segoe UI,Arial,sans-serif;background:var(--bg);color:var(--text)}
@@ -23,10 +24,11 @@ button{border:0;border-radius:9px;padding:10px 14px;background:var(--primary);co
 footer{text-align:center;color:var(--muted);font-size:11px;padding:18px}
 @media(max-width:1000px){.filters{grid-template-columns:repeat(2,1fr)}.kpis{grid-template-columns:repeat(2,1fr)}.grid{grid-template-columns:1fr}}
 @media(max-width:600px){.filters,.kpis{grid-template-columns:1fr}.container{padding:10px}}
+.actions{display:flex;gap:10px;margin-top:14px;flex-wrap:wrap}#up{background:#0b8f72}#dl{background:#fff;color:var(--primary)}#status{margin-top:10px;font-size:12px}footer b{color:var(--text)}
 </style>
 </head>
 <body>
-<header><div class="container"><h1>Dashboard de Ejecución Presupuestal de Inversiones</h1><p>Gobierno Regional de San Martín · Ejercicio 2026</p></div></header>
+<header><div class="container"><h1>Dashboard de Ejecución Presupuestal de Inversiones</h1><p>Gobierno Regional de San Martín · Ejercicio 2026</p><div class="actions"><button id="up">⬆ Actualizar Excel</button><button id="dl">⬇ Descargar datos.json</button><input type="file" id="file" accept=".xlsx,.xls,.csv" hidden></div><p id="status">Cargando datos…</p></div></header>
 <main class="container">
 <section class="filters">
 <div><label>Tipo de registro</label><select id="tipo"><option value="proyecto" selected>Solo proyectos</option><option value="producto">Solo productos</option><option value="">Proyectos y productos</option></select></div>
@@ -47,17 +49,17 @@ footer{text-align:center;color:var(--muted);font-size:11px;padding:18px}
 </section>
 
 <section class="grid">
-<div class="card"><h2>PIM vs. Devengado por mes</h2><div class="chartbox"><canvas id="monthly"></canvas></div></div>
+<div class="card"><h2>Devengado mensual y % de avance acumulado</h2><div class="chartbox"><canvas id="monthly"></canvas></div></div>
 <div class="card"><h2>Ejecución por provincia</h2><div class="chartbox"><canvas id="province"></canvas></div></div>
 <div class="card"><h2>PIM por función</h2><div class="chartbox"><canvas id="function"></canvas></div></div>
 <div class="card"><h2>Estado de ejecución de proyectos</h2><div class="chartbox"><canvas id="status"></canvas></div></div>
 <div class="card full"><h2>Top 10 proyectos por PIM</h2><div class="chartbox"><canvas id="topProjects"></canvas></div></div>
-<div class="card full"><h2>Detalle de inversiones</h2>
+<div class="card full"><h2>Detalle de inversiones <small id="count" style="color:var(--muted);font-weight:400"></small></h2>
 <div class="table-wrap"><table><thead><tr><th>Proyecto</th><th>UE / UEI</th><th>Provincia</th><th>Función</th><th>PIM</th><th>Devengado</th><th>% Ejec.</th></tr></thead><tbody id="tbody"></tbody></table></div>
 </div>
 </section>
 </main>
-<footer>Fuente: archivo Excel proporcionado por el usuario · Dashboard preparado para GitHub Pages.</footer>
+<footer>Fuente: archivo Excel proporcionado por el usuario · Para actualizar la página <b>para todos</b>: Actualizar Excel → Descargar datos.json → subirlo a GitHub.</footer>
 
 <script>
 let DATA=[], charts={};
@@ -78,7 +80,8 @@ function aggregate(rows,key,metric){
 }
 function sumDev(r){return devCols.reduce((s,c)=>s+(Number(r[c])||0),0)}
 function destroy(id){if(charts[id])charts[id].destroy()}
-function baseOpts(){return {responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}}}}
+function short(v){const a=Math.abs(v);return a>=1e6?(v/1e6).toFixed(1)+' M':a>=1e3?(v/1e3).toFixed(0)+' mil':v}
+function baseOpts(h){const ax={ticks:{callback:v=>short(v)}};return {responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>' '+money(c.parsed[h?'x':'y'])}}},scales:h?{x:ax}:{y:ax}}}
 
 function render(){
  const rows=filtered();
@@ -91,27 +94,28 @@ function render(){
  // monthly
  destroy('monthly');
  const monthlyDev=devCols.map(c=>rows.reduce((s,r)=>s+(Number(r[c])||0),0));
- charts.monthly=new Chart(document.getElementById('monthly'),{type:'bar',data:{labels:months,datasets:[{label:'Devengado',data:monthlyDev}]},options:baseOpts()});
+ let acc=0;const cum=monthlyDev.map(v=>(acc+=v,pim?acc/pim*100:0));
+ charts.monthly=new Chart(document.getElementById('monthly'),{type:'bar',data:{labels:months,datasets:[{label:'Devengado',data:monthlyDev,backgroundColor:'#0f4c81'},{type:'line',label:'% avance acumulado',data:cum,yAxisID:'y2',borderColor:'#c47a00',backgroundColor:'#c47a00',tension:.3}]},options:{responsive:true,maintainAspectRatio:false,plugins:{tooltip:{callbacks:{label:c=>c.dataset.yAxisID==='y2'?' '+c.parsed.y.toFixed(1)+'%':' '+money(c.parsed.y)}}},scales:{y:{ticks:{callback:v=>short(v)}},y2:{position:'right',min:0,ticks:{callback:v=>v+'%'},grid:{drawOnChartArea:false}}}}});
 
  // province
  destroy('province');let pm=aggregate(rows,'provincia_meta','mto_pim');let pentries=Object.entries(pm).sort((a,b)=>b[1]-a[1]).slice(0,10);
- charts.province=new Chart(document.getElementById('province'),{type:'bar',data:{labels:pentries.map(x=>x[0]),datasets:[{data:pentries.map(x=>x[1])}]},options:{...baseOpts(),indexAxis:'y'}});
+ charts.province=new Chart(document.getElementById('province'),{type:'bar',data:{labels:pentries.map(x=>x[0]),datasets:[{data:pentries.map(x=>x[1]),backgroundColor:'#0b8f72'}]},options:{...baseOpts(1),indexAxis:'y'}});
 
  // function
  destroy('function');let fm=aggregate(rows,'funcion','mto_pim');let fentries=Object.entries(fm).sort((a,b)=>b[1]-a[1]).slice(0,10);
- charts.function=new Chart(document.getElementById('function'),{type:'bar',data:{labels:fentries.map(x=>x[0]),datasets:[{data:fentries.map(x=>x[1])}]},options:{...baseOpts(),indexAxis:'y'}});
+ charts.function=new Chart(document.getElementById('function'),{type:'bar',data:{labels:fentries.map(x=>x[0]),datasets:[{data:fentries.map(x=>x[1]),backgroundColor:'#116a8d'}]},options:{...baseOpts(1),indexAxis:'y'}});
 
  // status by record
  let st={'Sin ejecución':0,'0–25%':0,'25–50%':0,'50–75%':0,'75–100%':0,'>100%':0};
  rows.forEach(r=>{let p=Number(r.mto_pim)||0,d=sumDev(r),x=p?d/p*100:0;if(d===0)st['Sin ejecución']++;else if(x<25)st['0–25%']++;else if(x<50)st['25–50%']++;else if(x<75)st['50–75%']++;else if(x<=100)st['75–100%']++;else st['>100%']++});
- destroy('status');charts.status=new Chart(document.getElementById('status'),{type:'doughnut',data:{labels:Object.keys(st),datasets:[{data:Object.values(st)}]},options:{responsive:true,maintainAspectRatio:false}});
+ destroy('status');charts.status=new Chart(document.getElementById('status'),{type:'doughnut',data:{labels:Object.keys(st),datasets:[{data:Object.values(st),backgroundColor:['#dc2626','#f97316','#eab308','#84cc16','#16a34a','#0f4c81']}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'bottom'}}}});
 
  // top projects
  let proj={};rows.forEach(r=>{let k=r.producto_proyecto||'Sin nombre';proj[k]=(proj[k]||0)+(Number(r.mto_pim)||0)});let top=Object.entries(proj).sort((a,b)=>b[1]-a[1]).slice(0,10);
- destroy('topProjects');charts.topProjects=new Chart(document.getElementById('topProjects'),{type:'bar',data:{labels:top.map(x=>x[0].length>55?x[0].slice(0,55)+'…':x[0]),datasets:[{data:top.map(x=>x[1])}]},options:{...baseOpts(),indexAxis:'y'}});
+ destroy('topProjects');charts.topProjects=new Chart(document.getElementById('topProjects'),{type:'bar',data:{labels:top.map(x=>x[0].length>55?x[0].slice(0,55)+'…':x[0]),datasets:[{data:top.map(x=>x[1]),backgroundColor:'#0f4c81'}]},options:{...baseOpts(1),indexAxis:'y'}});
 
  // table
- const tbody=document.getElementById('tbody');tbody.innerHTML='';
+ const tbody=document.getElementById('tbody');tbody.innerHTML='';document.getElementById('count').textContent=' · mostrando '+Math.min(rows.length,200)+' de '+num(rows.length);
  rows.slice().sort((a,b)=>(Number(b.mto_pim)||0)-(Number(a.mto_pim)||0)).slice(0,200).forEach(r=>{
    let p=Number(r.mto_pim)||0,d=sumDev(r),pct=p?d/p*100:0;
    let cls=pct===0?'low':pct<50?'mid':'ok';
@@ -119,7 +123,27 @@ function render(){
  });
 }
 function esc(x){return String(x??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m]))}
-fetch('datos.json').then(r=>r.json()).then(d=>{DATA=d;fill('ue','unidad_ejecutora');fill('prov','provincia_meta');fill('func','funcion');fill('fuente','fuente_financ');render()});
+function setData(d,label){DATA=d;['ue','prov','func','fuente'].forEach(id=>document.getElementById(id).length=1);fill('ue','unidad_ejecutora');fill('prov','provincia_meta');fill('func','funcion');fill('fuente','fuente_financ');document.getElementById('status').textContent='Datos: '+label+' · '+num(d.length)+' registros';render()}
+fetch('datos.json').then(r=>r.json()).then(d=>setData(d,'datos.json')).catch(()=>{document.getElementById('status').textContent='⚠ No se pudo cargar datos.json. Usa el botón "Actualizar Excel".'});
+document.getElementById('up').onclick=()=>document.getElementById('file').click();
+document.getElementById('file').onchange=async e=>{
+ const f=e.target.files[0];if(!f)return;
+ try{
+  const wb=XLSX.read(await f.arrayBuffer(),{type:'array'});let out=null;
+  for(const n of wb.SheetNames){
+   const rows=XLSX.utils.sheet_to_json(wb.Sheets[n],{header:1,defval:''});
+   const hi=rows.findIndex(r=>r.some(c=>String(c).trim().toLowerCase()==='mto_pim'));
+   if(hi<0)continue;
+   const h=rows[hi].map(c=>{c=String(c).trim();return /^ue\s*\/\s*uei$/i.test(c)?'UE /UEI':c.toLowerCase()});
+   out=rows.slice(hi+1).filter(r=>r.some(c=>c!=='')).map(r=>{const o={};h.forEach((k,i)=>{if(k)o[k]=k.startsWith('mto_')?(Number(String(r[i]).replace(/,/g,''))||0):r[i]});return o});
+   break;
+  }
+  if(!out||!out.length)throw new Error('no se encontró la columna "mto_pim". Usa el reporte con los mismos encabezados de siempre.');
+  setData(out,f.name);
+ }catch(err){alert('No se pudo leer el Excel: '+err.message)}
+ e.target.value='';
+};
+document.getElementById('dl').onclick=()=>{const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([JSON.stringify(DATA)],{type:'application/json'}));a.download='datos.json';a.click()};
 document.querySelectorAll('select,input').forEach(e=>e.addEventListener('input',render));
 document.getElementById('reset').onclick=()=>{document.querySelectorAll('select').forEach(e=>e.value='');document.getElementById('tipo').value='proyecto';document.getElementById('buscar').value='';render()}
 </script>
