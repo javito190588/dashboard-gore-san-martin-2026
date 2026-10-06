@@ -45,7 +45,7 @@ footer{text-align:center;color:var(--muted);font-size:11px;padding:18px}
 <div class="kpi"><div class="label">DEVENGADO</div><div class="value" id="kpiDev">—</div><div class="sub">Acumulado de meses con datos</div></div>
 <div class="kpi"><div class="label">EJECUCIÓN</div><div class="value" id="kpiPct">—</div><div class="sub">Devengado / PIM</div></div>
 <div class="kpi"><div class="label">CERTIFICADO</div><div class="value" id="kpiCert">—</div><div class="sub">Monto certificado</div></div>
-<div class="kpi"><div class="label">PROYECTOS</div><div class="value" id="kpiProj">—</div><div class="sub">Proyectos distintos (según filtro)</div></div>
+<div class="kpi"><div class="label">PROYECTOS</div><div class="value" id="kpiProj">—</div><div class="sub">Códigos únicos (según filtro)</div></div>
 </section>
 
 <section class="grid">
@@ -91,6 +91,10 @@ function render(){
  document.getElementById('kpiCert').textContent=money(cert);
  document.getElementById('kpiProj').textContent=num(new Set(rows.map(r=>r.producto_proyecto).filter(Boolean)).size);
 
+ // agrupar por código de proyecto
+ const G={};rows.forEach(r=>{const n=String(r.producto_proyecto||'Sin nombre'),k=(n.match(/^\d+/)||[n])[0];const g=G[k]||(G[k]={n,ue:new Set(),pv:new Set(),fn:new Set(),p:0,d:0});g.p+=Number(r.mto_pim)||0;g.d+=sumDev(r);[['ue','UE /UEI'],['pv','provincia_meta'],['fn','funcion']].forEach(([a,f])=>{if(r[f])g[a].add(r[f])})});
+ const list=Object.values(G).sort((a,b)=>b.p-a.p);
+ document.getElementById('kpiProj').textContent=num(list.length);
  // monthly
  destroy('monthly');
  const monthlyDev=devCols.map(c=>rows.reduce((s,r)=>s+(Number(r[c])||0),0));
@@ -107,7 +111,7 @@ function render(){
 
  // status by record
  let st={'Sin ejecución':0,'0–25%':0,'25–50%':0,'50–75%':0,'75–100%':0,'>100%':0};
- rows.forEach(r=>{let p=Number(r.mto_pim)||0,d=sumDev(r),x=p?d/p*100:0;if(d===0)st['Sin ejecución']++;else if(x<25)st['0–25%']++;else if(x<50)st['25–50%']++;else if(x<75)st['50–75%']++;else if(x<=100)st['75–100%']++;else st['>100%']++});
+ list.forEach(g=>{let p=g.p,d=g.d,x=p?d/p*100:0;if(d===0)st['Sin ejecución']++;else if(x<25)st['0–25%']++;else if(x<50)st['25–50%']++;else if(x<75)st['50–75%']++;else if(x<=100)st['75–100%']++;else st['>100%']++});
  destroy('status');charts.status=new Chart(document.getElementById('status'),{type:'doughnut',data:{labels:Object.keys(st),datasets:[{data:Object.values(st),backgroundColor:['#dc2626','#f97316','#eab308','#84cc16','#16a34a','#0f4c81']}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'bottom'}}}});
 
  // top projects
@@ -115,11 +119,11 @@ function render(){
  destroy('topProjects');charts.topProjects=new Chart(document.getElementById('topProjects'),{type:'bar',data:{labels:top.map(x=>x[0].length>55?x[0].slice(0,55)+'…':x[0]),datasets:[{data:top.map(x=>x[1]),backgroundColor:'#0f4c81'}]},options:{...baseOpts(1),indexAxis:'y'}});
 
  // table
- const tbody=document.getElementById('tbody');tbody.innerHTML='';document.getElementById('count').textContent=' · mostrando '+Math.min(rows.length,200)+' de '+num(rows.length);
- rows.slice().sort((a,b)=>(Number(b.mto_pim)||0)-(Number(a.mto_pim)||0)).slice(0,200).forEach(r=>{
-   let p=Number(r.mto_pim)||0,d=sumDev(r),pct=p?d/p*100:0;
+ const tbody=document.getElementById('tbody');tbody.innerHTML='';document.getElementById('count').textContent=' · mostrando '+Math.min(list.length,200)+' de '+num(list.length);
+ list.slice(0,200).forEach(g=>{
+   let p=g.p,d=g.d,pct=p?d/p*100:0;
    let cls=pct===0?'low':pct<50?'mid':'ok';
-   tbody.insertAdjacentHTML('beforeend',`<tr><td>${esc(r.producto_proyecto)}</td><td>${esc(r['UE /UEI'])}</td><td>${esc(r.provincia_meta)}</td><td>${esc(r.funcion)}</td><td class="num">${money(p)}</td><td class="num">${money(d)}</td><td class="num"><span class="badge ${cls}">${pct.toFixed(1)}%</span></td></tr>`);
+   tbody.insertAdjacentHTML('beforeend',`<tr><td>${esc(g.n)}</td><td>${esc([...g.ue].join(', '))}</td><td>${esc([...g.pv].join(', '))}</td><td>${esc([...g.fn].join(', '))}</td><td class="num">${money(p)}</td><td class="num">${money(d)}</td><td class="num"><span class="badge ${cls}">${pct.toFixed(1)}%</span></td></tr>`);
  });
 }
 function esc(x){return String(x??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m]))}
