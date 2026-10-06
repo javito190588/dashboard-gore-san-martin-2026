@@ -1,0 +1,124 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Dashboard de Ejecución Presupuestal — GORE San Martín 2026</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+<style>
+:root{--bg:#f4f7fb;--card:#fff;--text:#172033;--muted:#64748b;--line:#e5e7eb;--primary:#0f4c81;--accent:#0b8f72;--warn:#c47a00}
+*{box-sizing:border-box}body{margin:0;font-family:Inter,Segoe UI,Arial,sans-serif;background:var(--bg);color:var(--text)}
+header{background:linear-gradient(135deg,#0b3b66,#116a8d);color:white;padding:24px 28px;box-shadow:0 3px 12px #0002}
+header h1{margin:0 0 6px;font-size:25px}header p{margin:0;opacity:.88}
+.container{max-width:1500px;margin:auto;padding:20px}
+.filters,.kpis,.grid{display:grid;gap:14px}.filters{grid-template-columns:repeat(4,minmax(180px,1fr));background:var(--card);padding:16px;border-radius:14px;box-shadow:0 2px 10px #0000000a;margin-bottom:16px}
+label{font-size:12px;font-weight:700;color:var(--muted);display:block;margin-bottom:6px}
+select,input{width:100%;padding:10px;border:1px solid var(--line);border-radius:9px;background:white;color:var(--text)}
+button{border:0;border-radius:9px;padding:10px 14px;background:var(--primary);color:#fff;cursor:pointer;font-weight:700}
+.kpis{grid-template-columns:repeat(5,minmax(150px,1fr));margin-bottom:16px}.kpi{background:var(--card);padding:17px;border-radius:14px;box-shadow:0 2px 10px #0000000a}.kpi .label{color:var(--muted);font-size:12px}.kpi .value{font-size:24px;font-weight:800;margin-top:7px}.kpi .sub{font-size:11px;color:var(--muted);margin-top:5px}
+.grid{grid-template-columns:repeat(2,minmax(0,1fr));margin-bottom:16px}.card{background:var(--card);padding:18px;border-radius:14px;box-shadow:0 2px 10px #0000000a}.card h2{font-size:16px;margin:0 0 14px}.chartbox{height:320px}
+.full{grid-column:1/-1}
+.table-wrap{overflow:auto;max-height:520px;border:1px solid var(--line);border-radius:10px}table{width:100%;border-collapse:collapse;font-size:12px}th,td{padding:9px 10px;border-bottom:1px solid var(--line);text-align:left;white-space:nowrap}th{position:sticky;top:0;background:#f8fafc;z-index:1}td.num{text-align:right}
+.badge{padding:4px 7px;border-radius:999px;font-weight:700;font-size:10px}.ok{background:#dcfce7;color:#166534}.low{background:#fee2e2;color:#991b1b}.mid{background:#fef3c7;color:#92400e}
+footer{text-align:center;color:var(--muted);font-size:11px;padding:18px}
+@media(max-width:1000px){.filters{grid-template-columns:repeat(2,1fr)}.kpis{grid-template-columns:repeat(2,1fr)}.grid{grid-template-columns:1fr}}
+@media(max-width:600px){.filters,.kpis{grid-template-columns:1fr}.container{padding:10px}}
+</style>
+</head>
+<body>
+<header><div class="container"><h1>Dashboard de Ejecución Presupuestal de Inversiones</h1><p>Gobierno Regional de San Martín · Ejercicio 2026</p></div></header>
+<main class="container">
+<section class="filters">
+<div><label>Unidad Ejecutora</label><select id="ue"><option value="">Todas</option></select></div>
+<div><label>Provincia</label><select id="prov"><option value="">Todas</option></select></div>
+<div><label>Función</label><select id="func"><option value="">Todas</option></select></div>
+<div><label>Fuente de financiamiento</label><select id="fuente"><option value="">Todas</option></select></div>
+<div><label>Buscar proyecto</label><input id="buscar" placeholder="Nombre o código del proyecto..."></div>
+<div style="display:flex;align-items:end"><button id="reset">Restablecer filtros</button></div>
+</section>
+
+<section class="kpis">
+<div class="kpi"><div class="label">PIM</div><div class="value" id="kpiPim">—</div><div class="sub">Presupuesto Institucional Modificado</div></div>
+<div class="kpi"><div class="label">DEVENGADO</div><div class="value" id="kpiDev">—</div><div class="sub">Acumulado de meses con datos</div></div>
+<div class="kpi"><div class="label">EJECUCIÓN</div><div class="value" id="kpiPct">—</div><div class="sub">Devengado / PIM</div></div>
+<div class="kpi"><div class="label">CERTIFICADO</div><div class="value" id="kpiCert">—</div><div class="sub">Monto certificado</div></div>
+<div class="kpi"><div class="label">PROYECTOS</div><div class="value" id="kpiProj">—</div><div class="sub">Registros con inversión</div></div>
+</section>
+
+<section class="grid">
+<div class="card"><h2>PIM vs. Devengado por mes</h2><div class="chartbox"><canvas id="monthly"></canvas></div></div>
+<div class="card"><h2>Ejecución por provincia</h2><div class="chartbox"><canvas id="province"></canvas></div></div>
+<div class="card"><h2>PIM por función</h2><div class="chartbox"><canvas id="function"></canvas></div></div>
+<div class="card"><h2>Estado de ejecución de proyectos</h2><div class="chartbox"><canvas id="status"></canvas></div></div>
+<div class="card full"><h2>Top 10 proyectos por PIM</h2><div class="chartbox"><canvas id="topProjects"></canvas></div></div>
+<div class="card full"><h2>Detalle de inversiones</h2>
+<div class="table-wrap"><table><thead><tr><th>Proyecto</th><th>UE / UEI</th><th>Provincia</th><th>Función</th><th>PIM</th><th>Devengado</th><th>% Ejec.</th></tr></thead><tbody id="tbody"></tbody></table></div>
+</div>
+</section>
+</main>
+<footer>Fuente: archivo Excel proporcionado por el usuario · Dashboard preparado para GitHub Pages.</footer>
+
+<script>
+let DATA=[], charts={};
+const months=['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov'];
+const devCols=months.map((_,i)=>`mto_devenga_${String(i+1).padStart(2,'0')}`);
+
+function money(n){return new Intl.NumberFormat('es-PE',{style:'currency',currency:'PEN',maximumFractionDigits:0}).format(n||0)}
+function num(n){return new Intl.NumberFormat('es-PE',{maximumFractionDigits:0}).format(n||0)}
+function uniq(key){return [...new Set(DATA.map(r=>r[key]).filter(v=>v!==''&&v!=null))].sort((a,b)=>String(a).localeCompare(String(b),'es'))}
+function fill(id,key){const el=document.getElementById(id);uniq(key).forEach(v=>{let o=document.createElement('option');o.value=v;o.textContent=v;el.appendChild(o)})}
+function filtered(){
+ const ue=document.getElementById('ue').value, prov=document.getElementById('prov').value, fun=document.getElementById('func').value, fuente=document.getElementById('fuente').value, q=document.getElementById('buscar').value.toLowerCase();
+ return DATA.filter(r=>(!ue||r.unidad_ejecutora===ue)&&(!prov||r.provincia_meta===prov)&&(!fun||r.funcion===fun)&&(!fuente||r.fuente_financ===fuente)&&(!q||String(r.producto_proyecto).toLowerCase().includes(q)));
+}
+function aggregate(rows,key,metric){
+ const m={}; rows.forEach(r=>{let k=r[key]||'Sin dato';m[k]=(m[k]||0)+(Number(r[metric])||0)});return m;
+}
+function sumDev(r){return devCols.reduce((s,c)=>s+(Number(r[c])||0),0)}
+function destroy(id){if(charts[id])charts[id].destroy()}
+function baseOpts(){return {responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}}}}
+
+function render(){
+ const rows=filtered();
+ const pim=rows.reduce((s,r)=>s+(Number(r.mto_pim)||0),0), dev=rows.reduce((s,r)=>s+sumDev(r),0), cert=rows.reduce((s,r)=>s+(Number(r.mto_certificado)||0),0);
+ document.getElementById('kpiPim').textContent=money(pim);document.getElementById('kpiDev').textContent=money(dev);
+ document.getElementById('kpiPct').textContent=(pim?((dev/pim)*100).toFixed(1):'0.0')+'%';
+ document.getElementById('kpiCert').textContent=money(cert);
+ document.getElementById('kpiProj').textContent=num(new Set(rows.map(r=>r.producto_proyecto).filter(Boolean)).size);
+
+ // monthly
+ destroy('monthly');
+ const monthlyDev=devCols.map(c=>rows.reduce((s,r)=>s+(Number(r[c])||0),0));
+ charts.monthly=new Chart(document.getElementById('monthly'),{type:'bar',data:{labels:months,datasets:[{label:'Devengado',data:monthlyDev}]},options:baseOpts()});
+
+ // province
+ destroy('province');let pm=aggregate(rows,'provincia_meta','mto_pim');let pentries=Object.entries(pm).sort((a,b)=>b[1]-a[1]).slice(0,10);
+ charts.province=new Chart(document.getElementById('province'),{type:'bar',data:{labels:pentries.map(x=>x[0]),datasets:[{data:pentries.map(x=>x[1])}]},options:{...baseOpts(),indexAxis:'y'}});
+
+ // function
+ destroy('function');let fm=aggregate(rows,'funcion','mto_pim');let fentries=Object.entries(fm).sort((a,b)=>b[1]-a[1]).slice(0,10);
+ charts.function=new Chart(document.getElementById('function'),{type:'bar',data:{labels:fentries.map(x=>x[0]),datasets:[{data:fentries.map(x=>x[1])}]},options:{...baseOpts(),indexAxis:'y'}});
+
+ // status by record
+ let st={Sin ejecución:0,'0–25%':0,'25–50%':0,'50–75%':0,'75–100%':0,'>100%':0};
+ rows.forEach(r=>{let p=Number(r.mto_pim)||0,d=sumDev(r),x=p?d/p*100:0;if(d===0)st['Sin ejecución']++;else if(x<25)st['0–25%']++;else if(x<50)st['25–50%']++;else if(x<75)st['50–75%']++;else if(x<=100)st['75–100%']++;else st['>100%']++});
+ destroy('status');charts.status=new Chart(document.getElementById('status'),{type:'doughnut',data:{labels:Object.keys(st),datasets:[{data:Object.values(st)}]},options:{responsive:true,maintainAspectRatio:false}});
+
+ // top projects
+ let proj={};rows.forEach(r=>{let k=r.producto_proyecto||'Sin nombre';proj[k]=(proj[k]||0)+(Number(r.mto_pim)||0)});let top=Object.entries(proj).sort((a,b)=>b[1]-a[1]).slice(0,10);
+ destroy('topProjects');charts.topProjects=new Chart(document.getElementById('topProjects'),{type:'bar',data:{labels:top.map(x=>x[0].length>55?x[0].slice(0,55)+'…':x[0]),datasets:[{data:top.map(x=>x[1])}]},options:{...baseOpts(),indexAxis:'y'}});
+
+ // table
+ const tbody=document.getElementById('tbody');tbody.innerHTML='';
+ rows.slice().sort((a,b)=>(Number(b.mto_pim)||0)-(Number(a.mto_pim)||0)).slice(0,200).forEach(r=>{
+   let p=Number(r.mto_pim)||0,d=sumDev(r),pct=p?d/p*100:0;
+   let cls=pct===0?'low':pct<50?'mid':'ok';
+   tbody.insertAdjacentHTML('beforeend',`<tr><td>${esc(r.producto_proyecto)}</td><td>${esc(r['UE /UEI'])}</td><td>${esc(r.provincia_meta)}</td><td>${esc(r.funcion)}</td><td class="num">${money(p)}</td><td class="num">${money(d)}</td><td class="num"><span class="badge ${cls}">${pct.toFixed(1)}%</span></td></tr>`);
+ });
+}
+function esc(x){return String(x??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m]))}
+fetch('datos.json').then(r=>r.json()).then(d=>{DATA=d;fill('ue','unidad_ejecutora');fill('prov','provincia_meta');fill('func','funcion');fill('fuente','fuente_financ');render()});
+document.querySelectorAll('select,input').forEach(e=>e.addEventListener('input',render));
+document.getElementById('reset').onclick=()=>{document.querySelectorAll('select').forEach(e=>e.value='');document.getElementById('buscar').value='';render()}
+</script>
+</body></html>
