@@ -24,11 +24,11 @@ button{border:0;border-radius:9px;padding:10px 14px;background:var(--primary);co
 footer{text-align:center;color:var(--muted);font-size:11px;padding:18px}
 @media(max-width:1000px){.filters{grid-template-columns:repeat(2,1fr)}.kpis{grid-template-columns:repeat(2,1fr)}.grid{grid-template-columns:1fr}}
 @media(max-width:600px){.filters,.kpis{grid-template-columns:1fr}.container{padding:10px}}
-.actions{display:flex;gap:10px;margin-top:14px;flex-wrap:wrap}#up{background:#0b8f72}#dl{background:#fff;color:var(--primary)}#status{margin-top:10px;font-size:12px}footer b{color:var(--text)}
+.actions{display:flex;gap:10px;margin-top:14px;flex-wrap:wrap}#up{background:#0b8f72}#dl{background:#fff;color:var(--primary)}#datosEstado{margin-top:10px;font-size:12px}footer b{color:var(--text)}
 </style>
 </head>
 <body>
-<header><div class="container"><h1>Dashboard de Ejecución Presupuestal de Inversiones</h1><p>Gobierno Regional de San Martín · Ejercicio 2026</p><div class="actions"><button id="up">⬆ Actualizar Excel</button><button id="dl">⬇ Descargar datos.json</button><input type="file" id="file" accept=".xlsx,.xls,.csv" hidden></div><p id="status">Cargando datos…</p></div></header>
+<header><div class="container"><h1>Dashboard de Ejecución Presupuestal de Inversiones</h1><p>Gobierno Regional de San Martín · Ejercicio 2026</p><div class="actions"><button id="up">⬆ Actualizar Excel</button><button id="dl">⬇ Descargar datos.json</button><input type="file" id="file" accept=".xlsx,.xls,.csv" hidden></div><p id="datosEstado">Cargando datos…</p></div></header>
 <main class="container">
 <section class="filters">
 <div><label>Tipo de registro</label><select id="tipo"><option value="proyecto" selected>Solo proyectos</option><option value="producto">Solo productos</option><option value="">Proyectos y productos</option></select></div>
@@ -123,8 +123,8 @@ function render(){
  });
 }
 function esc(x){return String(x??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m]))}
-function setData(d,label){DATA=d;['ue','prov','func','fuente'].forEach(id=>document.getElementById(id).length=1);fill('ue','unidad_ejecutora');fill('prov','provincia_meta');fill('func','funcion');fill('fuente','fuente_financ');document.getElementById('status').textContent='Datos: '+label+' · '+num(d.length)+' registros';render()}
-fetch('datos.json').then(r=>r.json()).then(d=>setData(d,'datos.json')).catch(()=>{document.getElementById('status').textContent='⚠ No se pudo cargar datos.json. Usa el botón "Actualizar Excel".'});
+function setData(d,label){DATA=d;['ue','prov','func','fuente'].forEach(id=>document.getElementById(id).length=1);fill('ue','unidad_ejecutora');fill('prov','provincia_meta');fill('func','funcion');fill('fuente','fuente_financ');document.getElementById('datosEstado').textContent='Datos: '+label+' · '+num(d.length)+' registros';render()}
+fetch('datos.json').then(r=>r.json()).then(d=>setData(d,'datos.json')).catch(()=>{document.getElementById('datosEstado').textContent='⚠ No se pudo cargar datos.json. Usa el botón "Actualizar Excel".'});
 document.getElementById('up').onclick=()=>document.getElementById('file').click();
 document.getElementById('file').onchange=async e=>{
  const f=e.target.files[0];if(!f)return;
