@@ -100,7 +100,7 @@ function render(){
  charts.function=new Chart(document.getElementById('function'),{type:'bar',data:{labels:fentries.map(x=>x[0]),datasets:[{data:fentries.map(x=>x[1])}]},options:{...baseOpts(),indexAxis:'y'}});
 
  // status by record
- let st={Sin ejecución:0,'0–25%':0,'25–50%':0,'50–75%':0,'75–100%':0,'>100%':0};
+ let st={'Sin ejecución':0,'0–25%':0,'25–50%':0,'50–75%':0,'75–100%':0,'>100%':0};
  rows.forEach(r=>{let p=Number(r.mto_pim)||0,d=sumDev(r),x=p?d/p*100:0;if(d===0)st['Sin ejecución']++;else if(x<25)st['0–25%']++;else if(x<50)st['25–50%']++;else if(x<75)st['50–75%']++;else if(x<=100)st['75–100%']++;else st['>100%']++});
  destroy('status');charts.status=new Chart(document.getElementById('status'),{type:'doughnut',data:{labels:Object.keys(st),datasets:[{data:Object.values(st)}]},options:{responsive:true,maintainAspectRatio:false}});
 
