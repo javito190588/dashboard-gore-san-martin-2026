@@ -29,6 +29,7 @@ footer{text-align:center;color:var(--muted);font-size:11px;padding:18px}
 <header><div class="container"><h1>Dashboard de Ejecución Presupuestal de Inversiones</h1><p>Gobierno Regional de San Martín · Ejercicio 2026</p></div></header>
 <main class="container">
 <section class="filters">
+<div><label>Tipo de registro</label><select id="tipo"><option value="proyecto" selected>Solo proyectos</option><option value="producto">Solo productos</option><option value="">Proyectos y productos</option></select></div>
 <div><label>Unidad Ejecutora</label><select id="ue"><option value="">Todas</option></select></div>
 <div><label>Provincia</label><select id="prov"><option value="">Todas</option></select></div>
 <div><label>Función</label><select id="func"><option value="">Todas</option></select></div>
@@ -42,7 +43,7 @@ footer{text-align:center;color:var(--muted);font-size:11px;padding:18px}
 <div class="kpi"><div class="label">DEVENGADO</div><div class="value" id="kpiDev">—</div><div class="sub">Acumulado de meses con datos</div></div>
 <div class="kpi"><div class="label">EJECUCIÓN</div><div class="value" id="kpiPct">—</div><div class="sub">Devengado / PIM</div></div>
 <div class="kpi"><div class="label">CERTIFICADO</div><div class="value" id="kpiCert">—</div><div class="sub">Monto certificado</div></div>
-<div class="kpi"><div class="label">PROYECTOS</div><div class="value" id="kpiProj">—</div><div class="sub">Registros con inversión</div></div>
+<div class="kpi"><div class="label">PROYECTOS</div><div class="value" id="kpiProj">—</div><div class="sub">Proyectos distintos (según filtro)</div></div>
 </section>
 
 <section class="grid">
@@ -67,9 +68,10 @@ function money(n){return new Intl.NumberFormat('es-PE',{style:'currency',currenc
 function num(n){return new Intl.NumberFormat('es-PE',{maximumFractionDigits:0}).format(n||0)}
 function uniq(key){return [...new Set(DATA.map(r=>r[key]).filter(v=>v!==''&&v!=null))].sort((a,b)=>String(a).localeCompare(String(b),'es'))}
 function fill(id,key){const el=document.getElementById(id);uniq(key).forEach(v=>{let o=document.createElement('option');o.value=v;o.textContent=v;el.appendChild(o)})}
+function esProyecto(r){return /^2\d{6}/.test(String(r.producto_proyecto||'').trim())}
 function filtered(){
- const ue=document.getElementById('ue').value, prov=document.getElementById('prov').value, fun=document.getElementById('func').value, fuente=document.getElementById('fuente').value, q=document.getElementById('buscar').value.toLowerCase();
- return DATA.filter(r=>(!ue||r.unidad_ejecutora===ue)&&(!prov||r.provincia_meta===prov)&&(!fun||r.funcion===fun)&&(!fuente||r.fuente_financ===fuente)&&(!q||String(r.producto_proyecto).toLowerCase().includes(q)));
+ const tipo=document.getElementById('tipo').value, ue=document.getElementById('ue').value, prov=document.getElementById('prov').value, fun=document.getElementById('func').value, fuente=document.getElementById('fuente').value, q=document.getElementById('buscar').value.toLowerCase();
+ return DATA.filter(r=>(!tipo||(tipo==='proyecto'?esProyecto(r):!esProyecto(r)))&&(!ue||r.unidad_ejecutora===ue)&&(!prov||r.provincia_meta===prov)&&(!fun||r.funcion===fun)&&(!fuente||r.fuente_financ===fuente)&&(!q||String(r.producto_proyecto).toLowerCase().includes(q)));
 }
 function aggregate(rows,key,metric){
  const m={}; rows.forEach(r=>{let k=r[key]||'Sin dato';m[k]=(m[k]||0)+(Number(r[metric])||0)});return m;
@@ -119,6 +121,6 @@ function render(){
 function esc(x){return String(x??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m]))}
 fetch('datos.json').then(r=>r.json()).then(d=>{DATA=d;fill('ue','unidad_ejecutora');fill('prov','provincia_meta');fill('func','funcion');fill('fuente','fuente_financ');render()});
 document.querySelectorAll('select,input').forEach(e=>e.addEventListener('input',render));
-document.getElementById('reset').onclick=()=>{document.querySelectorAll('select').forEach(e=>e.value='');document.getElementById('buscar').value='';render()}
+document.getElementById('reset').onclick=()=>{document.querySelectorAll('select').forEach(e=>e.value='');document.getElementById('tipo').value='proyecto';document.getElementById('buscar').value='';render()}
 </script>
 </body></html>
