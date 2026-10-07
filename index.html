@@ -26,6 +26,7 @@ footer{text-align:center;color:var(--muted);font-size:11px;padding:18px}
 @media(max-width:600px){.filters,.kpis{grid-template-columns:1fr}.container{padding:10px}}
 .actions{display:flex;gap:10px;margin-top:14px;flex-wrap:wrap}#up{background:#0b8f72}#dl{background:#fff;color:var(--primary)}#datosEstado{margin-top:10px;font-size:12px}footer b{color:var(--text)}
 .c{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#ficha{grid-column:1/-1;display:none}.fc{border:1px solid var(--line);border-radius:12px;padding:14px;margin-top:4px;background:#f8fafc}.ft{font-weight:800;font-size:14px;margin-bottom:10px;color:var(--primary)}.fg{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:10px;font-size:13px}.fg span,.fa span{display:block;font-size:11px;color:var(--muted);font-weight:700;margin-bottom:2px}.fa{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;font-size:15px}.bar{height:8px;background:#e5e7eb;border-radius:9px;margin-top:10px;overflow:hidden}.bar i{display:block;height:100%;background:var(--accent)}.fnote,.fnone{color:var(--muted);font-size:12px;padding:4px 2px}@media(max-width:700px){.fg,.fa{grid-template-columns:1fr 1fr}}
 </style>
 </head>
 <body>
@@ -39,6 +40,7 @@ footer{text-align:center;color:var(--muted);font-size:11px;padding:18px}
 <div><label>Fuente de financiamiento</label><select id="fuente"><option value="">Todas</option></select></div>
 <div><label>Buscar proyecto</label><input id="buscar" placeholder="Nombre o código del proyecto..."></div>
 <div style="display:flex;align-items:end"><button id="reset">Restablecer filtros</button></div>
+<div id="ficha"></div>
 </section>
 
 <section class="kpis">
@@ -93,9 +95,11 @@ function render(){
  document.getElementById('kpiProj').textContent=num(new Set(rows.map(r=>r.producto_proyecto).filter(Boolean)).size);
 
  // agrupar por código de proyecto
- const G={};rows.forEach(r=>{const n=String(r.producto_proyecto||'Sin nombre'),k=(n.match(/^\d+/)||[n])[0];const g=G[k]||(G[k]={n,ue:new Set(),pv:new Set(),fn:new Set(),p:0,d:0});g.p+=Number(r.mto_pim)||0;g.d+=sumDev(r);[['ue','UE /UEI'],['pv','provincia_meta'],['fn','funcion']].forEach(([a,f])=>{if(r[f])g[a].add(r[f])});if(SSIK&&!g.ssi&&r[SSIK])g.ssi=String(r[SSIK]).trim()});
+ const G={};rows.forEach(r=>{const n=String(r.producto_proyecto||'Sin nombre'),k=(n.match(/^\d+/)||[n])[0];const g=G[k]||(G[k]={n,ue:new Set(),pv:new Set(),fn:new Set(),fu:new Set(),un:new Set(),p:0,d:0,c:0});g.p+=Number(r.mto_pim)||0;g.d+=sumDev(r);g.c+=Number(r.mto_certificado)||0;[['ue','UE /UEI'],['pv','provincia_meta'],['fn','funcion'],['fu','fuente_financ'],['un','unidad_ejecutora']].forEach(([a,f])=>{if(r[f])g[a].add(r[f])});if(SSIK&&!g.ssi&&r[SSIK])g.ssi=String(r[SSIK]).trim()});
  const list=Object.values(G).sort((a,b)=>b.p-a.p);
  document.getElementById('kpiProj').textContent=num(list.length);
+ const fi=document.getElementById('ficha'),q=document.getElementById('buscar').value.trim();
+ if(!q)fi.style.display='none';else{fi.style.display='block';fi.innerHTML=!list.length?'<div class="fnone">No se encontraron proyectos con ese nombre o código.</div>':(list.length>3?`<div class="fnote">${num(list.length)} proyectos coinciden; se muestran los 3 con mayor PIM. Escribe el código completo para ver uno solo.</div>`:'')+list.slice(0,3).map(ficha).join('')}
  // monthly
  destroy('monthly');
  const monthlyDev=devCols.map(c=>rows.reduce((s,r)=>s+(Number(r[c])||0),0));
@@ -129,6 +133,9 @@ function render(){
 }
 function cell(t,w){t=String(t??'');return `<td><div class="c" style="max-width:${w}px" title="${esc(t)}">${esc(t)}</div></td>`}
 function ssiCell(v){v=String(v||'').trim();if(/^https?:\/\//i.test(v))return `<td><a href="${esc(v)}" target="_blank" rel="noopener" style="color:var(--primary);font-weight:700">Ver SSI ↗</a></td>`;return `<td>${v?esc(v):'—'}</td>`}
+function ficha(g){const p=g.p,d=g.d,pct=p?d/p*100:0,j=t=>esc([...t].join(' · '))||'—';
+ const lk=/^https?:\/\//i.test(g.ssi||'')?`<a href="${esc(g.ssi)}" target="_blank" rel="noopener" style="color:var(--primary);font-weight:700">Ver SSI ↗</a>`:'—';
+ return `<div class="fc"><div class="ft">${esc(g.n)}</div><div class="fg"><div><span>Función</span>${j(g.fn)}</div><div><span>Fuente de financiamiento</span>${j(g.fu)}</div><div><span>Provincia</span>${j(g.pv)}</div><div><span>UEI</span>${j(g.ue)}</div><div><span>Unidad ejecutora</span>${j(g.un)}</div><div><span>SSI</span>${lk}</div></div><div class="fa"><div><span>PIM</span><b>${money(p)}</b></div><div><span>Certificado</span><b>${money(g.c)}</b></div><div><span>Devengado</span><b>${money(d)}</b></div><div><span>Avance financiero</span><b>${pct.toFixed(1)}%</b></div></div><div class="bar"><i style="width:${Math.min(pct,100)}%"></i></div></div>`}
 function esc(x){return String(x??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m]))}
 function setData(d,label){DATA=d;const ks=Object.keys(d[0]||{});SSIK=ks.find(k=>/^ssi$/i.test(k))||ks.find(k=>/ssi/i.test(k))||'';['ue','prov','func','fuente'].forEach(id=>document.getElementById(id).length=1);fill('ue','unidad_ejecutora');fill('prov','provincia_meta');fill('func','funcion');fill('fuente','fuente_financ');document.getElementById('datosEstado').textContent='Datos: '+label+' · '+num(d.length)+' registros';render()}
 fetch('datos.json').then(r=>r.json()).then(d=>setData(d,'datos.json')).catch(()=>{document.getElementById('datosEstado').textContent='⚠ No se pudo cargar datos.json. Usa el botón "Actualizar Excel".'});
