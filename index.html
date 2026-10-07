@@ -19,12 +19,13 @@ button{border:0;border-radius:9px;padding:10px 14px;background:var(--primary);co
 .kpis{grid-template-columns:repeat(5,minmax(150px,1fr));margin-bottom:16px}.kpi{background:var(--card);padding:17px;border-radius:14px;box-shadow:0 2px 10px #0000000a}.kpi .label{color:var(--muted);font-size:12px}.kpi .value{font-size:24px;font-weight:800;margin-top:7px}.kpi .sub{font-size:11px;color:var(--muted);margin-top:5px}
 .grid{grid-template-columns:repeat(2,minmax(0,1fr));margin-bottom:16px}.card{background:var(--card);padding:18px;border-radius:14px;box-shadow:0 2px 10px #0000000a}.card h2{font-size:16px;margin:0 0 14px}.chartbox{height:320px}
 .full{grid-column:1/-1}
-.table-wrap{overflow:auto;max-height:520px;border:1px solid var(--line);border-radius:10px}table{width:100%;border-collapse:collapse;font-size:12px}th,td{padding:9px 10px;border-bottom:1px solid var(--line);text-align:left;white-space:nowrap}th{position:sticky;top:0;background:#f8fafc;z-index:1}td.num{text-align:right}
+.table-wrap{overflow:auto;max-height:520px;border:1px solid var(--line);border-radius:10px}table{width:100%;border-collapse:collapse;font-size:12px}th,td{padding:7px 8px;border-bottom:1px solid var(--line);text-align:left;white-space:nowrap}th{position:sticky;top:0;background:#f8fafc;z-index:1}td.num{text-align:right}
 .badge{padding:4px 7px;border-radius:999px;font-weight:700;font-size:10px}.ok{background:#dcfce7;color:#166534}.low{background:#fee2e2;color:#991b1b}.mid{background:#fef3c7;color:#92400e}
 footer{text-align:center;color:var(--muted);font-size:11px;padding:18px}
 @media(max-width:1000px){.filters{grid-template-columns:repeat(2,1fr)}.kpis{grid-template-columns:repeat(2,1fr)}.grid{grid-template-columns:1fr}}
 @media(max-width:600px){.filters,.kpis{grid-template-columns:1fr}.container{padding:10px}}
 .actions{display:flex;gap:10px;margin-top:14px;flex-wrap:wrap}#up{background:#0b8f72}#dl{background:#fff;color:var(--primary)}#datosEstado{margin-top:10px;font-size:12px}footer b{color:var(--text)}
+.c{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 </style>
 </head>
 <body>
@@ -55,15 +56,15 @@ footer{text-align:center;color:var(--muted);font-size:11px;padding:18px}
 <div class="card"><h2>Estado de ejecución de proyectos</h2><div class="chartbox"><canvas id="status"></canvas></div></div>
 <div class="card full"><h2>Top 10 proyectos por PIM</h2><div class="chartbox"><canvas id="topProjects"></canvas></div></div>
 <div class="card full"><h2>Detalle de inversiones <small id="count" style="color:var(--muted);font-weight:400"></small></h2>
-<div class="table-wrap"><table><thead><tr><th>Proyecto</th><th>UE / UEI</th><th>Provincia</th><th>Función</th><th>PIM</th><th>Devengado</th><th>% Ejec.</th></tr></thead><tbody id="tbody"></tbody></table></div>
+<div class="table-wrap"><table><thead><tr><th>Proyecto</th><th>SSI</th><th>UE / UEI</th><th>Provincia</th><th>Función</th><th>PIM</th><th>Devengado</th><th>% Ejec.</th></tr></thead><tbody id="tbody"></tbody></table></div>
 </div>
 </section>
 </main>
 <footer>Fuente: archivo Excel proporcionado por el usuario · Para actualizar la página <b>para todos</b>: Actualizar Excel → Descargar datos.json → subirlo a GitHub.</footer>
 
 <script>
-let DATA=[], charts={};
-const months=['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov'];
+let DATA=[], charts={}, SSIK='';
+const months=['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
 const devCols=months.map((_,i)=>`mto_devenga_${String(i+1).padStart(2,'0')}`);
 
 function money(n){return new Intl.NumberFormat('es-PE',{style:'currency',currency:'PEN',maximumFractionDigits:0}).format(n||0)}
@@ -92,7 +93,7 @@ function render(){
  document.getElementById('kpiProj').textContent=num(new Set(rows.map(r=>r.producto_proyecto).filter(Boolean)).size);
 
  // agrupar por código de proyecto
- const G={};rows.forEach(r=>{const n=String(r.producto_proyecto||'Sin nombre'),k=(n.match(/^\d+/)||[n])[0];const g=G[k]||(G[k]={n,ue:new Set(),pv:new Set(),fn:new Set(),p:0,d:0});g.p+=Number(r.mto_pim)||0;g.d+=sumDev(r);[['ue','UE /UEI'],['pv','provincia_meta'],['fn','funcion']].forEach(([a,f])=>{if(r[f])g[a].add(r[f])})});
+ const G={};rows.forEach(r=>{const n=String(r.producto_proyecto||'Sin nombre'),k=(n.match(/^\d+/)||[n])[0];const g=G[k]||(G[k]={n,ue:new Set(),pv:new Set(),fn:new Set(),p:0,d:0});g.p+=Number(r.mto_pim)||0;g.d+=sumDev(r);[['ue','UE /UEI'],['pv','provincia_meta'],['fn','funcion']].forEach(([a,f])=>{if(r[f])g[a].add(r[f])});if(SSIK&&!g.ssi&&r[SSIK])g.ssi=String(r[SSIK]).trim()});
  const list=Object.values(G).sort((a,b)=>b.p-a.p);
  document.getElementById('kpiProj').textContent=num(list.length);
  // monthly
@@ -123,25 +124,40 @@ function render(){
  list.slice(0,200).forEach(g=>{
    let p=g.p,d=g.d,pct=p?d/p*100:0;
    let cls=pct===0?'low':pct<50?'mid':'ok';
-   tbody.insertAdjacentHTML('beforeend',`<tr><td>${esc(g.n)}</td><td>${esc([...g.ue].join(', '))}</td><td>${esc([...g.pv].join(', '))}</td><td>${esc([...g.fn].join(', '))}</td><td class="num">${money(p)}</td><td class="num">${money(d)}</td><td class="num"><span class="badge ${cls}">${pct.toFixed(1)}%</span></td></tr>`);
+   tbody.insertAdjacentHTML('beforeend',`<tr>${cell(g.n,340)}${ssiCell(g.ssi)}${cell([...g.ue].join(', '),90)}${cell([...g.pv].join(', '),120)}${cell([...g.fn].join(', '),150)}<td class="num">${money(p)}</td><td class="num">${money(d)}</td><td class="num"><span class="badge ${cls}">${pct.toFixed(1)}%</span></td></tr>`);
  });
 }
+function cell(t,w){t=String(t??'');return `<td><div class="c" style="max-width:${w}px" title="${esc(t)}">${esc(t)}</div></td>`}
+function ssiCell(v){v=String(v||'').trim();if(/^https?:\/\//i.test(v))return `<td><a href="${esc(v)}" target="_blank" rel="noopener" style="color:var(--primary);font-weight:700">Ver SSI ↗</a></td>`;return `<td>${v?esc(v):'—'}</td>`}
 function esc(x){return String(x??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m]))}
-function setData(d,label){DATA=d;['ue','prov','func','fuente'].forEach(id=>document.getElementById(id).length=1);fill('ue','unidad_ejecutora');fill('prov','provincia_meta');fill('func','funcion');fill('fuente','fuente_financ');document.getElementById('datosEstado').textContent='Datos: '+label+' · '+num(d.length)+' registros';render()}
+function setData(d,label){DATA=d;const ks=Object.keys(d[0]||{});SSIK=ks.find(k=>/^ssi$/i.test(k))||ks.find(k=>/ssi/i.test(k))||'';['ue','prov','func','fuente'].forEach(id=>document.getElementById(id).length=1);fill('ue','unidad_ejecutora');fill('prov','provincia_meta');fill('func','funcion');fill('fuente','fuente_financ');document.getElementById('datosEstado').textContent='Datos: '+label+' · '+num(d.length)+' registros';render()}
 fetch('datos.json').then(r=>r.json()).then(d=>setData(d,'datos.json')).catch(()=>{document.getElementById('datosEstado').textContent='⚠ No se pudo cargar datos.json. Usa el botón "Actualizar Excel".'});
 document.getElementById('up').onclick=()=>document.getElementById('file').click();
+const KEEP=/^(ano_eje|unidad_ejecutora|ue \/uei|producto_proyecto|funcion|departamento_meta|provincia_meta|distrito_meta|fuente_financ|ssi|mto_(pia|modificaciones|pim|certificado|compro_anual|devenga_\d+|girado_\d+|pagado_\d+))$/;
+function ssiUrl(ws,rr,cc,prod){
+ const c=ws[XLSX.utils.encode_cell({r:rr,c:cc})];if(!c)return '';
+ if(c.l&&c.l.Target)return c.l.Target;
+ const f=String(c.f||'');
+ let m=f.match(/HYPERLINK\(\s*"([^"]+)"\s*&\s*\$?([A-Z]+)\$?(\d+)/i);
+ if(m){const t=ws[m[2]+m[3]];const cod=t&&t.v!==undefined&&t.v!==''?t.v:String(prod||'').slice(0,7);return m[1]+cod}
+ m=f.match(/HYPERLINK\(\s*"([^"]+)"/i);return m?m[1]:'';
+}
+function parseWB(wb){
+ for(const n of wb.SheetNames){
+  const ws=wb.Sheets[n],rows=XLSX.utils.sheet_to_json(ws,{header:1,defval:'',blankrows:true});
+  const hi=rows.findIndex(r=>r.some(c=>String(c).trim().toLowerCase()==='mto_pim'));
+  if(hi<0)continue;
+  const R=XLSX.utils.decode_range(ws['!ref']);
+  const h=rows[hi].map(c=>{c=String(c).trim();return /^ue\s*\/\s*uei$/i.test(c)?'UE /UEI':c.toLowerCase()});
+  const si=h.indexOf('ssi')>=0?h.indexOf('ssi'):h.findIndex(k=>/ssi/.test(k)),hp=h.indexOf('producto_proyecto');
+  return rows.slice(hi+1).map((r,j)=>({r,j})).filter(x=>x.r.some(c=>c!=='')).map(({r,j})=>{const o={};h.forEach((k,i)=>{if(!k||!KEEP.test(k.toLowerCase()))return;let v=r[i];if(k.startsWith('mto_'))v=Number(String(v).replace(/,/g,''))||0;else if(i===si)v=ssiUrl(ws,R.s.r+hi+1+j,R.s.c+i,r[hp])||v;o[k]=typeof v==='string'?v.trim():v});return o});
+ }
+ return null;
+}
 document.getElementById('file').onchange=async e=>{
  const f=e.target.files[0];if(!f)return;
  try{
-  const wb=XLSX.read(await f.arrayBuffer(),{type:'array'});let out=null;
-  for(const n of wb.SheetNames){
-   const rows=XLSX.utils.sheet_to_json(wb.Sheets[n],{header:1,defval:''});
-   const hi=rows.findIndex(r=>r.some(c=>String(c).trim().toLowerCase()==='mto_pim'));
-   if(hi<0)continue;
-   const h=rows[hi].map(c=>{c=String(c).trim();return /^ue\s*\/\s*uei$/i.test(c)?'UE /UEI':c.toLowerCase()});
-   out=rows.slice(hi+1).filter(r=>r.some(c=>c!=='')).map(r=>{const o={};h.forEach((k,i)=>{if(k)o[k]=k.startsWith('mto_')?(Number(String(r[i]).replace(/,/g,''))||0):r[i]});return o});
-   break;
-  }
+  const out=parseWB(XLSX.read(await f.arrayBuffer(),{type:'array'}));
   if(!out||!out.length)throw new Error('no se encontró la columna "mto_pim". Usa el reporte con los mismos encabezados de siempre.');
   setData(out,f.name);
  }catch(err){alert('No se pudo leer el Excel: '+err.message)}
