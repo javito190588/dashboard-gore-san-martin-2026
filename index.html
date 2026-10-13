@@ -24,13 +24,13 @@ button{border:0;border-radius:9px;padding:10px 14px;background:var(--primary);co
 footer{text-align:center;color:var(--muted);font-size:11px;padding:18px}
 @media(max-width:1000px){.filters{grid-template-columns:repeat(2,1fr)}.kpis{grid-template-columns:repeat(2,1fr)}.grid{grid-template-columns:1fr}}
 @media(max-width:600px){.filters,.kpis{grid-template-columns:1fr}.container{padding:10px}}
-.actions{display:flex;gap:10px;margin-top:14px;flex-wrap:wrap}#up{background:#0b8f72}#dl{background:#fff;color:var(--primary)}#datosEstado{margin-top:10px;font-size:12px}footer b{color:var(--text)}
+.actions{display:flex;gap:10px;margin-top:14px;flex-wrap:wrap}#up{background:#0b8f72}#dl,#orig{background:#fff;color:var(--primary)}#datosEstado{margin-top:10px;font-size:12px}footer b{color:var(--text)}
 .c{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 #ficha{grid-column:1/-1;display:none}.fc{border:1px solid var(--line);border-radius:12px;padding:14px;margin-top:4px;background:#f8fafc}.ft{font-weight:800;font-size:14px;margin-bottom:10px;color:var(--primary)}.fg{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:10px;font-size:13px}.fg span,.fa span{display:block;font-size:11px;color:var(--muted);font-weight:700;margin-bottom:2px}.fa{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;font-size:15px}.bar{height:8px;background:#e5e7eb;border-radius:9px;margin-top:10px;overflow:hidden}.bar i{display:block;height:100%;background:var(--accent)}.fnote,.fnone{color:var(--muted);font-size:12px;padding:4px 2px}@media(max-width:700px){.fg,.fa{grid-template-columns:1fr 1fr}}
 </style>
 </head>
 <body>
-<header><div class="container"><h1>Dashboard de Ejecución Presupuestal de Inversiones</h1><p>Gobierno Regional de San Martín · Ejercicio 2026</p><div class="actions"><button id="up">⬆ Actualizar Excel</button><button id="dl">⬇ Descargar datos.json</button><input type="file" id="file" accept=".xlsx,.xls,.csv" hidden></div><p id="datosEstado">Cargando datos…</p></div></header>
+<header><div class="container"><h1>Dashboard de Ejecución Presupuestal de Inversiones</h1><p>Gobierno Regional de San Martín · Ejercicio 2026</p><div class="actions"><button id="up">⬆ Actualizar Excel</button><button id="dl">⬇ Descargar datos.json</button><button id="orig">↺ Datos originales</button><input type="file" id="file" accept=".xlsx,.xls,.csv" hidden></div><p id="datosEstado">Cargando datos…</p></div></header>
 <main class="container">
 <section class="filters">
 <div><label>Tipo de registro</label><select id="tipo"><option value="proyecto" selected>Solo proyectos</option><option value="producto">Solo productos</option><option value="">Proyectos y productos</option></select></div>
@@ -137,8 +137,20 @@ function ficha(g){const p=g.p,d=g.d,pct=p?d/p*100:0,j=t=>esc([...t].join(' · ')
  const lk=/^https?:\/\//i.test(g.ssi||'')?`<a href="${esc(g.ssi)}" target="_blank" rel="noopener" style="color:var(--primary);font-weight:700">Ver SSI ↗</a>`:'—';
  return `<div class="fc"><div class="ft">${esc(g.n)}</div><div class="fg"><div><span>Función</span>${j(g.fn)}</div><div><span>Fuente de financiamiento</span>${j(g.fu)}</div><div><span>Provincia</span>${j(g.pv)}</div><div><span>UEI</span>${j(g.ue)}</div><div><span>Unidad ejecutora</span>${j(g.un)}</div><div><span>SSI</span>${lk}</div></div><div class="fa"><div><span>PIM</span><b>${money(p)}</b></div><div><span>Certificado</span><b>${money(g.c)}</b></div><div><span>Devengado</span><b>${money(d)}</b></div><div><span>Avance financiero</span><b>${pct.toFixed(1)}%</b></div></div><div class="bar"><i style="width:${Math.min(pct,100)}%"></i></div></div>`}
 function esc(x){return String(x??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m]))}
-function setData(d,label){DATA=d;const ks=Object.keys(d[0]||{});SSIK=ks.find(k=>/^ssi$/i.test(k))||ks.find(k=>/ssi/i.test(k))||'';['ue','prov','func','fuente'].forEach(id=>document.getElementById(id).length=1);fill('ue','unidad_ejecutora');fill('prov','provincia_meta');fill('func','funcion');fill('fuente','fuente_financ');document.getElementById('datosEstado').textContent='Datos: '+label+' · '+num(d.length)+' registros';render()}
-fetch('datos.json').then(r=>r.json()).then(d=>setData(d,'datos.json')).catch(()=>{document.getElementById('datosEstado').textContent='⚠ No se pudo cargar datos.json. Usa el botón "Actualizar Excel".'});
+function setData(d,label,note){DATA=d;const ks=Object.keys(d[0]||{});SSIK=ks.find(k=>/^ssi$/i.test(k))||ks.find(k=>/ssi/i.test(k))||'';['ue','prov','func','fuente'].forEach(id=>document.getElementById(id).length=1);fill('ue','unidad_ejecutora');fill('prov','provincia_meta');fill('func','funcion');fill('fuente','fuente_financ');document.getElementById('datosEstado').textContent='Datos: '+label+' · '+num(d.length)+' registros'+(note||'');render()}
+const IDB={open:()=>new Promise((res,rej)=>{const q=indexedDB.open('grsm2026',1);q.onupgradeneeded=()=>q.result.createObjectStore('kv');q.onsuccess=()=>res(q.result);q.onerror=()=>rej(q.error)}),
+ async get(k){const db=await this.open();return new Promise((res,rej)=>{const r=db.transaction('kv').objectStore('kv').get(k);r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error)})},
+ async set(k,v){const db=await this.open();return new Promise((res,rej)=>{const t=db.transaction('kv','readwrite');t.objectStore('kv').put(v,k);t.oncomplete=()=>res();t.onerror=()=>rej(t.error)})},
+ async del(k){const db=await this.open();return new Promise((res,rej)=>{const t=db.transaction('kv','readwrite');t.objectStore('kv').delete(k);t.oncomplete=()=>res();t.onerror=()=>rej(t.error)})}};
+async function init(){
+ let saved=null;try{saved=await IDB.get('data')}catch(e){}
+ let lm=0;try{const h=await fetch('datos.json',{method:'HEAD'});lm=Date.parse(h.headers.get('last-modified'))||0}catch(e){}
+ if(saved&&saved.data&&saved.data.length&&(!lm||saved.at>lm)){setData(saved.data,saved.label,' · guardado en este navegador ('+new Date(saved.at).toLocaleDateString('es-PE')+')');return}
+ if(saved){try{await IDB.del('data')}catch(e){}}
+ try{setData(await (await fetch('datos.json')).json(),'datos.json')}catch(e){document.getElementById('datosEstado').textContent='⚠ No se pudo cargar datos.json. Usa el botón "Actualizar Excel".'}
+}
+init();
+document.getElementById('orig').onclick=async()=>{try{await IDB.del('data')}catch(e){}try{setData(await (await fetch('datos.json',{cache:'no-store'})).json(),'datos.json')}catch(e){alert('No se pudo cargar datos.json')}};
 document.getElementById('up').onclick=()=>document.getElementById('file').click();
 const KEEP=/^(ano_eje|unidad_ejecutora|ue \/uei|producto_proyecto|funcion|departamento_meta|provincia_meta|distrito_meta|fuente_financ|ssi|mto_(pia|modificaciones|pim|certificado|compro_anual|devenga_\d+|girado_\d+|pagado_\d+))$/;
 function ssiUrl(ws,rr,cc,prod){
@@ -166,7 +178,7 @@ document.getElementById('file').onchange=async e=>{
  try{
   const out=parseWB(XLSX.read(await f.arrayBuffer(),{type:'array'}));
   if(!out||!out.length)throw new Error('no se encontró la columna "mto_pim". Usa el reporte con los mismos encabezados de siempre.');
-  setData(out,f.name);
+  let note=' · guardado en este navegador';try{await IDB.set('data',{data:out,label:f.name,at:Date.now()})}catch(e){note=' · (no se pudo guardar en este navegador)'}setData(out,f.name,note);
  }catch(err){alert('No se pudo leer el Excel: '+err.message)}
  e.target.value='';
 };
